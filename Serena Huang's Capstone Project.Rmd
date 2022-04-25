@@ -1,0 +1,214 @@
+---
+title: "Serena Huang's Capstone Project"
+author: "Serena Huang"
+date: "7/29/2020"
+output: pdf_document
+---
+# Capstone Project
+## Serena Huang
+
+
+## Physical distancing, face masks, and eye protection to prevent person-to-person transmission of SARS-CoV-2 and COVID-19: a systematic review and meta-analysis
+This paper measures the effects of physical distance, face masks, and eye protection in preventing further transmission of viruses such as COVID-19 and SARS. These studies take place in either healthcare or non-healthcare settings. The researchers obtained data by screening titles, abstracts and going over full texts. To cross-check the screening results, they used artificial intelligence. The researchers find that as the physical distancing lengthens, the transmission of viruses lowers, the use of face masks and the protection of the eyes also lead to a large reduction in risk of infection. 
+
+## The effect of large-scale anti-contagion policies on the COVID-19 pandemic
+This paper aims to investigate the effect of anti-contagion policies, such as travel restrictions, social distancing and quarantines, on the growth rate of infections. China, South Korea, Italy, Iran, France and the United States were the main countries the researchers evaluated as they compiled data on the timing of policies deployments and daily infection growth. The results are that deployment of anti-contagion policies in the countries mentioned above have significantly reduced the growth rate of infections, slowing the spread of the pandemic remarkably. 
+
+## The effect of travel restrictions on the spread of the 2019 novel coronavirus (COVID-19) outbreak
+This paper mainly focuses on the effects of the Wuhan travel ban. By using the global metapopulation disease transmission model, the researchers seek to find out how the travel limitations affected the spread of COVID-19. They come to the conclusion that the travel ban in Wuhan only slightly delayed the spread of the disease in mainland China, however, the ban had a more distinct effect at reducing international case importations. 
+
+## Identifying airborne transmission as the dominant route for the spread of COVID-19
+This paper stresses that airborne transmission is the dominant way to spread COVID-19, therefore, while most mitigation measures are effective in reducing infection, they don’t directly protect against airborne transmission. The researchers take data on trends and mitigation measures in Wuhan, Italy and New York City.  It is revealed that mandated face covering is the most crucial measure in preventing airborne transmission. Social distancing and quarantining minimize contact transmission but are still insufficient when protecting oneself.
+
+## Evidence that high temperatures and intermediate relative humidity might favor the spread of COVID-19 in tropical climate: A case study for the most affected Brazilian cities
+The authors focus on the relationship between meteorological conditions and the transmission of COVID-19. They obtained epidemiological data, weather data, cumulative cases and contamination rates of five cities in Brazil to assist their studies. The results show that higher temperatures and intermediate relative humidity may lead to a faster transmission rate of the COVID-19. 
+
+```{r,echo=TRUE,warning=FALSE,error=FALSE}
+rm(list=ls())
+setwd("/Users/apple/Documents/夏天/2020夏天/IPAL/Capstone/shapefiles")
+#Setting libraries 
+
+library(lubridate)
+library(tidyverse)
+library(sf)
+library(tidycensus)
+library(stargazer, quietly = TRUE)
+library(ggplot2)
+library(tinytex)
+library(broom)
+library(sandwich)
+
+shape_county <- st_read("cb_2018_us_county_500k.shp")
+shape_state <- st_read("cb_2018_us_state_500k.shp")
+mask_state <- read_csv("Mask Policy by State.csv")
+covid <- read_csv("NYT-COVID-us-counties.csv")
+
+# Making sure that both dataframes have lowercase state names
+mask_state <- mask_state %>%
+  mutate(STATENAME=tolower(state_name))
+shape_state <- shape_state %>%
+  mutate(STATENAME=tolower(NAME))
+
+# Merging both dataframes
+maskandshape <- full_join(shape_state, mask_state, by = "STATENAME")
+
+# Getting rid of the islands
+maskandshape1 <- maskandshape  %>% 
+  subset(STATENAME != "american samoa" & STATENAME !=  "united states virgin islands" & STATENAME != "guam" & STATENAME != "commonwealth of the northern mariana islands" & STATENAME != "alaska" & STATENAME != "puerto rico" & STATENAME != "hawaii")
+
+# Using the time length of the mask mandates to replace the starting date 
+maskandshape1 <- maskandshape1 %>%
+  mutate(TODAY="07/29/2020") %>%
+  mutate(
+    start=mdy(`mask_policy_start`),
+    today=mdy(`TODAY`),
+    length=today-start)
+
+# Plotting 
+maskandshape1 %>%
+  ggplot() +
+  geom_sf(aes(fill=length),col="#FFFFFF",size=0.1,alpha=0.9) +
+  scale_fill_distiller(palette = "Greens",
+                       na.value="#FFCCCC",
+                       breaks=c(2,29,57,84,112),
+                    labels=c("07-27-2020","06-30-2020","06-02-2020","05-06-2020","04-08-2020"))+
+  labs(
+    title="The Implemention of Mask Mandates Throughout USA",
+    fill ="Starting Date \nof Mask Mandates"
+  ) +
+  theme_void() 
+
+```
+
+```{r,echo=TRUE,warning=FALSE,error=FALSE}
+mask_stateclean <- read_csv("Copy of Mask Policy by State.csv") #I have already changed the conditions in the csv file
+shape_stateclean <- st_read("cb_2018_us_state_500k.shp")
+
+# Making sure that both dataframes have lowercase state names
+mask_stateclean <- mask_stateclean %>%
+  mutate(STATENAME=tolower(state_name))
+shape_stateclean <- shape_stateclean %>%
+  mutate(STATENAME=tolower(NAME))
+
+# Merging both databases
+maskandshapeclean <- full_join(shape_state, mask_stateclean, by = "STATENAME")
+
+# Extracting the coordinates (I think)
+maskandshape2 <- cbind(maskandshapeclean,st_coordinates(st_centroid(maskandshapeclean)))
+
+# Removing territories etc.
+maskandshape2 <- maskandshape2  %>% 
+  subset(STATENAME != "american samoa" & STATENAME !=  "united states virgin islands" & STATENAME != "guam" & STATENAME != "commonwealth of the northern mariana islands" & STATENAME != "alaska" & STATENAME != "puerto rico" & STATENAME != "hawaii")
+
+# Using the time length of the mask mandates to replace the starting date
+maskandshape2 <- maskandshape2 %>%
+  mutate(TODAY="07/29/2020") %>%
+  mutate(
+    start=mdy(`mask_policy_start`),
+    today=mdy(`TODAY`),
+    length=today-start) 
+
+
+# Plotting 
+conditions_level <- c("All public places","Public and retail places","Most public places","Indoor","In all types of businesses")
+
+maskandshape2 %>%
+  ggplot() +
+  geom_sf(aes(fill=length),col="#FFFFFF",size=0.1,alpha=0.9) +
+  scale_fill_distiller(palette = "Greens",
+                       na.value="#FFCCCC",
+                       breaks=c(2,29,57,84,112),
+                       labels=c("07-27-2020","06-30-2020","06-02-2020","05-06-2020","04-08-2020"))+ 
+  geom_point(aes(x = X, y = Y,
+                 shape=factor(conditions,levels=conditions_level),color=factor(conditions,levels=conditions_level)),alpha=1,size=1) +
+  scale_shape_discrete("Conditions") +
+  scale_color_manual("Conditions",values=c("#CC0000","#FF9900","#FFFF00","#0099FF","#CC66FF")) +
+  labs(
+    title="The Implemention of Mask Mandates Throughout USA",
+    fill ="Starting Date \nof Mask Mandates"
+  ) +
+  theme_void()
+```
+
+```{r,echo=TRUE,warning=FALSE,error=FALSE}
+covidtotalcases <- covid %>%
+  mutate(date = as.Date(date), format = "%Y.%m.%d") %>% 
+  group_by(date,state) %>%
+  summarize(countcases=sum(cases))
+
+covidtotalcases %>%
+  ggplot(aes(x=date,y=countcases,col=state)) + 
+  geom_line(size=0.2) + 
+  theme(legend.position="bottom",legend.key.size=unit(0.2,"cm"))+
+  scale_y_continuous(expand=c(0,0), breaks = seq(0, 500000, 50000)) +
+  scale_x_continuous(expand=c(0,0), breaks = pretty(covidtotalcases$date, n=9)) +
+  labs(
+    title="Total COVID-19 Cases in USA by State",
+    x="Date",
+    y="Total COVID-19 Cases",
+    color="State"
+  ) 
+```
+
+
+```{r,echo=TRUE,warning=FALSE,error=FALSE}
+covidtotaldeaths <- covid %>%
+  mutate(date = as.Date(date), format = "%Y.%m.%d") %>% 
+  group_by(date,state) %>%
+  summarize(countdeaths=sum(deaths))
+
+covidtotaldeaths %>%
+  ggplot(aes(x=date,y=countdeaths,col=state)) + 
+  geom_line(size=0.2) + 
+  theme(legend.position="bottom",legend.key.size=unit(0.2,"cm"))+
+  scale_x_continuous(expand=c(0,0), breaks = pretty(covidtotalcases$date, n=9)) +
+  labs(
+    title="Total COVID-19 Deaths in USA by State",
+    x="Date",
+    y="Total COVID-19 Deaths",
+    color="State"
+  ) 
+```
+```{r,echo=TRUE,warning=FALSE,error=FALSE}
+covidtotal <- full_join(covidtotalcases,covidtotaldeaths)
+covidtotal <- covidtotal %>%
+  mutate(deathrate=countdeaths/countcases) 
+
+covidtotal %>%
+  ggplot(aes(x=date,y=deathrate,col=state)) + 
+  geom_line(size=0.2) + 
+  theme(legend.position="bottom",legend.key.size=unit(0.2,"cm"))+
+  scale_x_continuous(expand=c(0,0), breaks = pretty(covidtotalcases$date, n=9)) +
+  labs(
+    title="COVID-19 Death Rate in USA by State",
+    x="Date",
+    y="COVID-19 Death Rate",
+    color="State"
+  ) 
+```
+
+```{r,echo=TRUE,warning=FALSE,error=FALSE}
+library(ggplot2)
+library(gganimate)
+
+covidmapanimate <- covidmap %>%
+  ggplot() +
+  geom_sf(aes(geometry=geometry,fill=countcases),col="#000000",size=0.1,alpha=0.9) +
+  scale_fill_distiller(palette = "Spectral",
+                       na.value="#FFCCCC", 
+                       limits=c(0,500000),
+                       breaks=c(100000,200000,300000,400000),                     
+                       labels=c("100","200","300","400")
+  )+
+  
+  labs(
+    title="COVID-19 Cases Throughout USA",
+    subtitle="April 26th 2020",
+    fill ="Number of \nof COVID-19 Cases \n(Thousands)"
+  ) +
+  transition_manual(date) +
+  labs(title = "Date: {current_frame}") +
+  theme_void() 
+
+animate(covidmapanimate,nframes=140,renderer=gifski_renderer("COVID-19 Cases Time Lapse.gif"),height=700,width=1000)
+```
